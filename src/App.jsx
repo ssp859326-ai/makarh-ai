@@ -60,7 +60,7 @@ function FunctionalWorkspace({active, onBack, onNotice}) {
     const next=[...messages,{role:'user',text:q}];
     setMessages(next); setInput(''); setBusy(true);
     try {
-      const answer=await askAI(q,next.slice(-10).map(m=>({role:m.role==='assistant'?'assistant':'user',content:m.text})));
+      const answer=await askAI(q,next.slice(-11,-1).map(m=>({role:m.role==='assistant'?'assistant':'user',content:m.text})));
       const final=[...next,{role:'assistant',text:answer}]; setMessages(final); localStorage.setItem('makarh-chat',JSON.stringify(final));
     } catch(e) {
       const final=[...next,{role:'assistant',text:'AI connection issue: '+e.message+' Please try again in a moment.'}]; setMessages(final); localStorage.setItem('makarh-chat',JSON.stringify(final));
@@ -142,7 +142,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const filteredServices = services.filter(s => (s.title + ' ' + s.desc).toLowerCase().includes(query.toLowerCase()));
   const filteredProjects = projects.filter(p => (p.name + ' ' + p.type).toLowerCase().includes(query.toLowerCase()));
-  const selectService = (title) => { setActive(title); setNotice(title + ' is ready for the next integration step.'); setTimeout(() => setNotice(''), 3500); };
+  const selectService = (title) => { const route = title === 'AI Chat' || title === 'Explore tools' || title === 'New project' ? 'AI Studio' : title === 'Poster Studio' ? 'Poster Maker' : title; setActive(route); setNotice(''); };
 
   return <div className="app-shell">
     {mobileNav && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
