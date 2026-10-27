@@ -80,7 +80,7 @@ function FunctionalWorkspace({active, onBack, onNotice}) {
     const next=[...messages,{role:'user',text:q}];
     setMessages(next); setInput(''); setBusy(true);
     try {
-      const wantsImage = /\\b(generate|create|make|draw|render)\\b.{0,60}\\b(image|picture|photo|artwork)\\b|\\b(image|picture|photo|artwork)\\b.{0,60}\\b(generate|create|make|draw)\\b/i.test(q);
+      const wantsImage = /\\b(generate|create|make|draw|render)\\b.{0,60}\\b(image|picture|photo|artwork|illustration)\\b|\\b(image|picture|photo|artwork|illustration)\\b.{0,60}\\b(generate|create|make|draw)\\b|^.{0,180}\\b(realistic|cinematic|photorealistic|highly detailed|ultra realistic)\\b.{0,100}\\b(image|picture|photo|artwork|illustration)\\b/i.test(q);
       if (wantsImage) {
         const response = await fetch('/api/image', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q})});
         if (!response.ok) {
