@@ -6,7 +6,7 @@ export async function onRequestPost({ request, env }) {
     if (!prompt) return Response.json({ error: "Please describe the image you want." }, { status: 400 });
     if (prompt.length > 1800) return Response.json({ error: "Please shorten the image description to 1,800 characters or less." }, { status: 413 });
     const result = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
-      prompt: "Create a high-quality, polished image based on this description. Prioritize clear composition, coherent details, pleasing lighting, professional visual quality, and the requested style. Avoid unnecessary text, watermarks, signatures, borders, and logos. Description: " + prompt,
+      prompt: "Create a highly photorealistic, lifelike image based on the user's description. For animals and people, use realistic anatomy, natural proportions, authentic skin or fur texture, lifelike eyes, fine individual hair/fur detail, realistic camera optics, natural lighting, physically plausible shadows, and subtle real-world imperfections. Make it look like a professional DSLR photograph, not a cartoon, illustration, 3D render, animation, toy, painting, or game asset. Preserve the requested subject, setting, composition, and mood. Only use an obviously stylized or cartoon look if the user explicitly asks for it. No text, watermark, signature, border, or logo unless requested. Description: " + prompt,
       steps: 4
     });
     if (!result?.image) return Response.json({ error: "The image model did not return an image. Please try again." }, { status: 502 });
