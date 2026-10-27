@@ -47,7 +47,7 @@ function FunctionalWorkspace({active, onBack, onNotice, username}) {
   const [imageQuery,setImageQuery] = useState('');
   const [imageResults,setImageResults] = useState([]);
   const [posterImage,setPosterImage] = useState('');
-  const [saved,setSaved] = useState(()=>{try{return JSON.parse(localStorage.getItem('makarh-projects')||'[]')}catch{return []}});
+  const [saved,setSaved] = useState(()=>{try{return JSON.parse(localStorage.getItem(projectStorageKey)||'[]')}catch{return []}});
   const [pdfText,setPdfText] = useState('');
   const [pdfName,setPdfName] = useState('');
   const [pdfSummary,setPdfSummary] = useState('');
