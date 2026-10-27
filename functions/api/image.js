@@ -17,7 +17,7 @@ export async function onRequestPost({ request, env }) {
       headers: {
         "Content-Type": "image/jpeg",
         "Cache-Control": "no-store",
-        "Content-Disposition": 'inline; filename="makarh-ai-image.jpg"',
+        "Content-Disposition": 'inline; filename="makarh-ai-image.png"',
         "X-Content-Type-Options": "nosniff"
       }
     });
