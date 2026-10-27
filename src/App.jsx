@@ -80,7 +80,7 @@ function FunctionalWorkspace({active, onBack, onNotice}) {
     const next=[...messages,{role:'user',text:q}];
     setMessages(next); setInput(''); setBusy(true);
     try {
-      const wantsImage = /\b(generate|create|make|draw|render)\b.{0,60}\b(image|picture|photo|artwork|illustration)\b|\b(image|picture|photo|artwork|illustration)\b.{0,60}\b(generate|create|make|draw)\b|^.{0,180}\b(realistic|cinematic|photorealistic|highly detailed|ultra realistic)\b.{0,100}\b(image|picture|photo|artwork|illustration)\b|^\s*(a|an)?\s*(real|realistic|photorealistic|cinematic|cartoon|anime|3d)\b/i.test(q);
+      const wantsImage = /\b(generate|create|make|draw|render|generate me|create me)\b.{0,100}\b(image|picture|photo|artwork|illustration|wallpaper|portrait)\b|\b(image|picture|photo|artwork|illustration|wallpaper|portrait)\b.{0,100}\b(generate|create|make|draw|render)\b|\b(photorealistic|photo realistic|realistic photo|cinematic photo|image generator|generate an image|make a poster image)\b|^\s*(please\s+)?(a|an)\s+(real|realistic|photorealistic|cinematic|cartoon|anime|3d|white lion|black lion|golden-hour|beautiful village|highly detailed)\b/i.test(q);
       if (wantsImage) {
         const response = await fetch('/api/image', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q})});
         if (!response.ok) {
@@ -92,7 +92,9 @@ function FunctionalWorkspace({active, onBack, onNotice}) {
         if (!blob.type.startsWith('image/')) throw new Error('Image model did not return an image.');
         const url=URL.createObjectURL(blob);
         const final=[...next,{role:'assistant',text:'I generated this image from your request.',image:url}];
-        setMessages(final); localStorage.setItem('makarh-chat',JSON.stringify(final));
+        setMessages(final);
+        // Blob URLs only live in this browser session; persist text history without broken image URLs.
+        try { localStorage.setItem('makarh-chat',JSON.stringify(final.map(({image,...m})=>m))); } catch {}
       } else {
         const answer=await askAI(q,next.slice(-11,-1).map(m=>({role:m.role==='assistant'?'assistant':'user',content:m.text})));
         const final=[...next,{role:'assistant',text:answer}]; setMessages(final); localStorage.setItem('makarh-chat',JSON.stringify(final));
