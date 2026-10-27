@@ -4,3 +4,8 @@ pages_build_output_dir = "./dist"
 
 [ai]
 binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "makarh-ai-users"
+database_id = "71c070ba-2af0-4b34-9591-16baf66c0dfe"
