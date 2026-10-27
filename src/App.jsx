@@ -29,6 +29,7 @@ const projects = [
 
 function FunctionalWorkspace({active, onBack, onNotice}) {
   const [input,setInput] = useState('');
+  const [busy,setBusy] = useState(false);
   const [messages,setMessages] = useState(()=>{try{return JSON.parse(localStorage.getItem('makarh-chat')||'[]')}catch{return []}});
   const [topic,setTopic] = useState('');
   const [platform,setPlatform] = useState('Instagram Reel');
@@ -36,33 +37,102 @@ function FunctionalWorkspace({active, onBack, onNotice}) {
   const [posterTitle,setPosterTitle] = useState('Grand Opening');
   const [posterSub,setPosterSub] = useState('Special offers available now');
   const [posterStyle,setPosterStyle] = useState('violet');
+  const [imageQuery,setImageQuery] = useState('');
+  const [imageResults,setImageResults] = useState([]);
+  const [posterImage,setPosterImage] = useState('');
   const [saved,setSaved] = useState(()=>{try{return JSON.parse(localStorage.getItem('makarh-projects')||'[]')}catch{return []}});
   const [pdfText,setPdfText] = useState('');
   const [pdfName,setPdfName] = useState('');
+  const [pdfSummary,setPdfSummary] = useState('');
+  const [pdfBusy,setPdfBusy] = useState(false);
   const saveProject = (title,type,body) => {
     const next=[{id:Date.now(),title,type,body,created:new Date().toLocaleString()} ,...saved];
     setSaved(next); localStorage.setItem('makarh-projects',JSON.stringify(next)); onNotice('Project saved on this device.');
   };
-  const send = () => {
-    const q=input.trim(); if(!q)return;
-    const next=[...messages,{role:'user',text:q},{role:'assistant',text:'I’m Makarh AI. Your request is saved in this chat. Live AI answers are not connected yet, so I can’t honestly generate a real model response until an AI provider is configured. You can still use Video Scripts and Poster Maker right now.'}];
-    setMessages(next); localStorage.setItem('makarh-chat',JSON.stringify(next)); setInput('');
+  const askAI = async (prompt, history=[]) => {
+    const response = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,history})});
+    const data=await response.json();
+    if(!response.ok) throw new Error(data.error||'AI service is temporarily unavailable.');
+    return data.text||'I could not create a response. Please try again.';
   };
-  const makeScript = () => {
-    if(!topic.trim()){onNotice('Please enter a topic first.');return;}
-    const s = platform==='Instagram Reel' ? 'HOOK (0–3 sec): '+topic+' baare ik zaroori gall!\n\nMAIN (3–20 sec): '+topic+' nu asaan tareeke naal samjhiye. Is de 3 main points han: pehla, faida te problem nu samjho; dooja, sahi jaankari verify karo; teeja, apni zaroorat mutabik action lao.\n\nCTA (20–30 sec): Hor ajihe tips layi page follow karo te video share karo.' : 'TITLE: '+topic+'\n\nINTRODUCTION: Ajj assi gall karange '+topic+' baare.\n\nMAIN POINTS:\n1. Topic di basic jaankari.\n2. Is de faide te zaroori gallan.\n3. Aam galtiyan ton kiven bachna.\n\nCONCLUSION: Umeed hai eh jaankari tuhade kam aayi. Apne sawaal comment karo.';
-    setScript(s);
+  const send = async () => {
+    const q=input.trim(); if(!q||busy)return;
+    const next=[...messages,{role:'user',text:q}];
+    setMessages(next); setInput(''); setBusy(true);
+    try {
+      const answer=await askAI(q,next.slice(-10).map(m=>({role:m.role==='assistant'?'assistant':'user',content:m.text})));
+      const final=[...next,{role:'assistant',text:answer}]; setMessages(final); localStorage.setItem('makarh-chat',JSON.stringify(final));
+    } catch(e) {
+      const final=[...next,{role:'assistant',text:'AI connection issue: '+e.message+' Please try again in a moment.'}]; setMessages(final); localStorage.setItem('makarh-chat',JSON.stringify(final));
+    } finally {setBusy(false);}
   };
-  const toolHeader = <div className="tool-head"><div><div className="eyebrow"><span className="status-dot"/> MAKARH AI WORKSPACE</div><h1>{active}</h1><p className="subtitle">Use the tool below. Your saved projects stay in this browser on this device.</p></div><button className="primary-button" onClick={onBack}><ArrowRight size={16}/> Overview</button></div>;
-  if(active==='AI Studio') return <section className="tool-page">{toolHeader}<div className="tool-card"><div className="tool-card-title"><MessageSquareText size={20}/><div><h2>AI Chat</h2><p>Chat interface is ready; live model connection is not configured yet.</p></div><span className="tag orange">BACKEND NEEDED</span></div><div className="chat-log">{messages.length?messages.map((m,i)=><div key={i} className={'chat-bubble '+m.role}><b>{m.role==='user'?'You':'Makarh AI'}</b><p>{m.text}</p></div>):<div className="empty-state">Start by typing a question below.</div>}</div><div className="chat-compose"><input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Type your question..."/><button className="primary-button" onClick={send}>Send <ArrowRight size={15}/></button></div><button className="text-link" onClick={()=>{setMessages([]);localStorage.removeItem('makarh-chat')}}>Clear chat</button></div></section>;
-  if(active==='Video Scripts') return <section className="tool-page">{toolHeader}<div className="tool-card"><h2>Punjabi Video Script Writer</h2><p className="tool-help">Enter your topic to generate a ready-to-edit script template.</p><label className="tool-label">Video topic<input className="tool-input" value={topic} onChange={e=>setTopic(e.target.value)} placeholder="e.g. Ayurvedic daily habits, furniture sale"/></label><label className="tool-label">Format<select className="tool-input" value={platform} onChange={e=>setPlatform(e.target.value)}><option>Instagram Reel</option><option>YouTube video</option></select></label><button className="primary-button" onClick={makeScript}><Sparkles size={16}/> Generate script</button>{script&&<div className="generated-output"><pre>{script}</pre><button className="primary-button" onClick={()=>saveProject(topic+' script','Video Scripts',script)}>Save project</button><button className="secondary-button" onClick={()=>navigator.clipboard?.writeText(script).then(()=>onNotice('Script copied.')).catch(()=>onNotice('Copy is not supported in this browser.'))}>Copy script</button></div>}</div></section>;
-  if(active==='Poster Maker') return <section className="tool-page">{toolHeader}<div className="tool-grid"><div className="tool-card"><h2>Poster Maker</h2><label className="tool-label">Main heading<input className="tool-input" value={posterTitle} onChange={e=>setPosterTitle(e.target.value)} /></label><label className="tool-label">Subtitle<input className="tool-input" value={posterSub} onChange={e=>setPosterSub(e.target.value)} /></label><label className="tool-label">Theme<select className="tool-input" value={posterStyle} onChange={e=>setPosterStyle(e.target.value)}><option value="violet">Purple glow</option><option value="blue">Ocean blue</option><option value="pink">Pink festival</option></select></label><button className="primary-button" onClick={()=>saveProject(posterTitle+' poster','Poster Maker',posterTitle+'\n'+posterSub+'\nTheme: '+posterStyle)}>Save poster design</button></div><div className={'poster-preview '+posterStyle}><div className="poster-brand">✦ MAKARH CREATIVE</div><h2>{posterTitle||'Your headline'}</h2><p>{posterSub||'Your subtitle goes here'}</p><div className="poster-stamp">MAKE IT<br/>MEMORABLE</div></div></div></section>;
-  if(active==='PDF Tools') return <section className="tool-page">{toolHeader}<div className="tool-card"><h2>Text file reader</h2><p className="tool-help">Choose a .txt file to read its contents here. Full PDF extraction needs a PDF parser integration.</p><label className="tool-label">Choose text file<input className="tool-input" type="file" accept=".txt,text/plain" onChange={e=>{const f=e.target.files?.[0];if(f){setPdfName(f.name);const reader=new FileReader();reader.onload=()=>setPdfText(String(reader.result||''));reader.readAsText(f)}}}/></label>{pdfName&&<><p className="tool-help">File: {pdfName}</p><textarea className="tool-textarea" value={pdfText} onChange={e=>setPdfText(e.target.value)}/><button className="primary-button" onClick={()=>saveProject(pdfName,'Text file',pdfText)}>Save extracted text</button></>}</div></section>;
+  const makeScript = async () => {
+    if(!topic.trim()){onNotice('Pehla video da topic likho.');return;}
+    setBusy(true);
+    try {
+      const prompt='You are a professional Punjabi/Hinglish short-video scriptwriter. Create a ready-to-record '+platform+' script about: '+topic+'. Use natural spoken Punjabi in Gurmukhi only if user requested it, otherwise Punjabi written in Roman script. Include a strong curiosity hook, specific helpful points, scene/visual suggestions, voiceover, timing and a non-pushy CTA. For Instagram Reel target 30 seconds with 0-3 sec hook, 3-22 sec main, 22-30 sec CTA. Avoid generic filler. Never invent medical or financial guarantees; qualify claims. Return polished script only.';
+      setScript(await askAI(prompt));
+    } catch(e){setScript('Could not reach AI right now: '+e.message);}
+    finally{setBusy(false);}
+  };
+  const searchImages = async () => {
+    if(!imageQuery.trim()){onNotice('Image search layi topic likho.');return;}
+    setBusy(true);
+    try {
+      const url='https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch='+encodeURIComponent('filetype:bitmap '+imageQuery)+'&gsrnamespace=6&gsrlimit=12&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=640&format=json&origin=*';
+      const r=await fetch(url); const data=await r.json();
+      const items=Object.values(data.query?.pages||{}).map(p=>({title:p.title.replace(/^File:/,''),url:p.imageinfo?.[0]?.thumburl||p.imageinfo?.[0]?.url,source:p.imageinfo?.[0]?.descriptionurl,license:p.imageinfo?.[0]?.extmetadata?.LicenseShortName?.value||'Check license'})).filter(x=>x.url);
+      setImageResults(items); if(!items.length)onNotice('Koi result nahi milya. Search terms badal ke try karo.');
+    } catch(e){onNotice('Image search filhaal available nahi. Internet connection check karo.');}
+    finally{setBusy(false);}
+  };
+  const downloadPoster = async () => {
+    const canvas=document.createElement('canvas'); canvas.width=1080; canvas.height=1350;
+    const ctx=canvas.getContext('2d');
+    const palettes={violet:['#160d2c','#673de6','#d8c9ff'],blue:['#061d37','#0879b8','#c5edff'],pink:['#3a0b2c','#d83c88','#ffe0ef']};
+    const c=palettes[posterStyle]||palettes.violet;
+    const grad=ctx.createLinearGradient(0,0,1080,1350);grad.addColorStop(0,c[0]);grad.addColorStop(1,c[1]);ctx.fillStyle=grad;ctx.fillRect(0,0,1080,1350);
+    if(posterImage){try{const im=new Image();im.crossOrigin='anonymous';im.src=posterImage;await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=reject});ctx.globalAlpha=.24;ctx.drawImage(im,0,0,1080,1350);ctx.globalAlpha=1;}catch{}}
+    ctx.fillStyle='#ffffff18';ctx.beginPath();ctx.arc(900,160,270,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=c[2];ctx.font='bold 28px Arial';ctx.fillText('✦ MAKARH CREATIVE',72,100);
+    ctx.fillStyle='#ffffff';ctx.font='bold 84px Arial';
+    const words=(posterTitle||'Your headline').split(' ');let lines=[],line='';
+    words.forEach(w=>{const test=line?line+' '+w:w;if(ctx.measureText(test).width>900&&line){lines.push(line);line=w}else line=test});if(line)lines.push(line);
+    let y=470-(lines.length-1)*52;lines.slice(0,4).forEach(t=>{ctx.fillText(t,72,y);y+=100});
+    ctx.fillStyle='#ffffff';ctx.globalAlpha=.92;ctx.font='38px Arial';
+    const sub=(posterSub||'Your message').split(' ');let sl=[],st='';sub.forEach(w=>{const test=st?st+' '+w:w;if(ctx.measureText(test).width>850&&st){sl.push(st);st=w}else st=test});if(st)sl.push(st);
+    sl.slice(0,4).forEach(t=>{ctx.fillText(t,76,y+40);y+=55});ctx.globalAlpha=1;
+    ctx.fillStyle='#ffffff';ctx.font='bold 24px Arial';ctx.fillText('MAKARH AI  •  CREATE SOMETHING GREAT',72,1270);
+    const a=document.createElement('a');a.download='makarh-poster.png';a.href=canvas.toDataURL('image/png');a.click();
+  };
+  const readFile = async file => {
+    setPdfName(file.name);setPdfText('');setPdfSummary('');
+    try {
+      if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')){
+        const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs');
+        pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+        const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;
+        let text=''; for(let n=1;n<=pdf.numPages;n++){const page=await pdf.getPage(n);const c=await page.getTextContent();text+='\\n\\n--- Page '+n+' ---\\n'+c.items.map(i=>i.str).join(' ');}
+        setPdfText(text.trim()||'No selectable text found. This PDF may be scanned images.');
+      } else {setPdfText(await file.text());}
+    } catch(e){setPdfText('Could not read this file. It may be password-protected or scanned. Details: '+e.message);}
+  };
+  const summarizePDF = async () => {
+    if(!pdfText.trim()){onNotice('Pehla file upload karo.');return;}
+    setPdfBusy(true);
+    try{setPdfSummary(await askAI('Summarize this document in clear Punjabi/Hinglish. Give key points, important dates/numbers and action items. Do not make up missing information. Document text:\\n'+pdfText.slice(0,24000)));}
+    catch(e){setPdfSummary('AI summary unavailable: '+e.message);}
+    finally{setPdfBusy(false);}
+  };
+  const toolHeader = <div className="tool-head"><div><div className="eyebrow"><span className="status-dot"/> MAKARH AI WORKSPACE</div><h1>{active}</h1><p className="subtitle">Create, edit, and save useful work. Projects are stored locally on this device.</p></div><button className="primary-button" onClick={onBack}><ArrowRight size={16}/> Overview</button></div>;
+  if(active==='AI Studio') return <section className="tool-page">{toolHeader}<div className="tool-card"><div className="tool-card-title"><MessageSquareText size={20}/><div><h2>Makarh AI Chat</h2><p>AI assistant for writing, ideas, explanations and practical tasks.</p></div><span className="tag violet">AI CONNECTED</span></div><div className="chat-log">{messages.length?messages.map((m,i)=><div key={i} className={'chat-bubble '+m.role}><b>{m.role==='user'?'You':'Makarh AI'}</b><p>{m.text}</p></div>):<div className="empty-state">Sat sri akaal! Ask a question, request a script, or get help with a task.</div>}{busy&&<div className="chat-bubble assistant"><b>Makarh AI</b><p>Thinking…</p></div>}</div><div className="chat-compose"><input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send()} placeholder="Ask Makarh AI anything…"/><button className="primary-button" disabled={busy} onClick={send}>{busy?'Thinking…':'Send'} <ArrowRight size={15}/></button></div><button className="text-link" onClick={()=>{setMessages([]);localStorage.removeItem('makarh-chat')}}>Clear chat</button></div></section>;
+  if(active==='Video Scripts') return <section className="tool-page">{toolHeader}<div className="tool-card"><h2>Professional Video Script Studio</h2><p className="tool-help">AI creates a tailored script with hook, voiceover, scenes, timing and CTA—not a generic template.</p><label className="tool-label">Video topic<input className="tool-input" value={topic} onChange={e=>setTopic(e.target.value)} placeholder="e.g. Ayurveda daily habits, furniture sale"/></label><label className="tool-label">Format<select className="tool-input" value={platform} onChange={e=>setPlatform(e.target.value)}><option>Instagram Reel</option><option>YouTube video</option><option>Facebook video ad</option></select></label><button className="primary-button" disabled={busy} onClick={makeScript}><Sparkles size={16}/>{busy?'Writing…':'Generate professional script'}</button>{script&&<div className="generated-output"><pre>{script}</pre><button className="primary-button" onClick={()=>saveProject(topic+' script','Video Scripts',script)}>Save project</button><button className="secondary-button" onClick={()=>navigator.clipboard?.writeText(script).then(()=>onNotice('Script copied.')).catch(()=>onNotice('Copy is not supported.'))}>Copy script</button></div>}</div></section>;
+  if(active==='Poster Maker') return <section className="tool-page">{toolHeader}<div className="tool-grid"><div className="tool-card"><h2>Poster Maker</h2><p className="tool-help">Design a poster, add a real reference image, then download a PNG.</p><label className="tool-label">Main heading<input className="tool-input" value={posterTitle} onChange={e=>setPosterTitle(e.target.value)}/></label><label className="tool-label">Subtitle<input className="tool-input" value={posterSub} onChange={e=>setPosterSub(e.target.value)}/></label><label className="tool-label">Theme<select className="tool-input" value={posterStyle} onChange={e=>setPosterStyle(e.target.value)}><option value="violet">Purple glow</option><option value="blue">Ocean blue</option><option value="pink">Pink festival</option></select></label><button className="primary-button" onClick={downloadPoster}>Download poster PNG</button><button className="secondary-button" onClick={()=>saveProject(posterTitle+' poster','Poster Maker',posterTitle+'\\n'+posterSub+'\\nTheme: '+posterStyle+'\\nImage: '+posterImage)}>Save poster project</button><hr/><h3>Find real images</h3><div className="chat-compose"><input value={imageQuery} onChange={e=>setImageQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&searchImages()} placeholder="Search e.g. herbal plants, shop interior"/><button className="primary-button" disabled={busy} onClick={searchImages}>Search</button></div><p className="tool-help">Images from Wikimedia Commons. Check each image's license before commercial use.</p><div className="image-results">{imageResults.map((im,i)=><button className={'image-result '+(posterImage===im.url?'selected':'')} key={im.url+i} onClick={()=>setPosterImage(im.url)}><img src={im.url} alt={im.title} loading="lazy"/><span>{im.title}</span><small>{im.license}</small></button>)}</div></div><div className={'poster-preview '+posterStyle} style={posterImage?{backgroundImage:'linear-gradient(135deg,rgba(12,8,26,.82),rgba(20,12,42,.62)),url('+posterImage+')',backgroundSize:'cover',backgroundPosition:'center'}:{}}><div className="poster-brand">✦ MAKARH CREATIVE</div><h2>{posterTitle||'Your headline'}</h2><p>{posterSub||'Your subtitle goes here'}</p><div className="poster-stamp">MAKE IT<br/>MEMORABLE</div></div></div></section>;
+  if(active==='PDF Tools') return <section className="tool-page">{toolHeader}<div className="tool-card"><h2>PDF & Document Tools</h2><p className="tool-help">Upload a text file or selectable-text PDF to extract, edit, copy and summarize its contents with AI.</p><label className="tool-label">Choose PDF or text file<input className="tool-input" type="file" accept=".pdf,.txt,text/plain,application/pdf" onChange={e=>{const file=e.target.files?.[0];if(file)readFile(file)}}/></label>{pdfName&&<><p className="tool-help">File: {pdfName}</p><textarea className="tool-textarea" value={pdfText} onChange={e=>setPdfText(e.target.value)}/><div className="button-row"><button className="primary-button" onClick={summarizePDF} disabled={pdfBusy||busy}>{pdfBusy||busy?'Summarizing…':'Summarize with AI'}</button><button className="secondary-button" onClick={()=>navigator.clipboard?.writeText(pdfText).then(()=>onNotice('Document text copied.'))}>Copy text</button><button className="secondary-button" onClick={()=>saveProject(pdfName,'PDF/Text Document',pdfText)}>Save text</button></div>{pdfSummary&&<div className="generated-output"><h3>AI Summary</h3><pre>{pdfSummary}</pre><button className="secondary-button" onClick={()=>navigator.clipboard?.writeText(pdfSummary)}>Copy summary</button></div>}</>}</div><p className="tool-help">Note: scanned/image-only PDFs may need OCR, which is not enabled in this version.</p></section>;
   if(active==='My Projects') return <section className="tool-page">{toolHeader}<div className="tool-card"><h2>Saved projects</h2>{saved.length?saved.map(p=><article className="saved-project" key={p.id}><div><strong>{p.title}</strong><small>{p.type} · {p.created}</small><p>{p.body}</p></div><button className="secondary-button" onClick={()=>{const next=saved.filter(x=>x.id!==p.id);setSaved(next);localStorage.setItem('makarh-projects',JSON.stringify(next))}}>Delete</button></article>):<div className="empty-state">No saved projects yet. Create a script or poster and tap Save.</div>}</div></section>;
-  if(active==='Settings') return <section className="tool-page">{toolHeader}<div className="tool-card"><h2>Workspace settings</h2><p className="tool-help">Data is currently saved locally in this browser, not synced between devices.</p><button className="secondary-button" onClick={()=>{if(confirm('Delete all locally saved Makarh projects and chat?')){localStorage.removeItem('makarh-projects');localStorage.removeItem('makarh-chat');setSaved([]);setMessages([]);onNotice('Local workspace data cleared.')}}}>Clear local workspace data</button></div></section>;
+  if(active==='Settings') return <section className="tool-page">{toolHeader}<div className="tool-card"><h2>Workspace settings</h2><p className="tool-help">Projects and chat history are stored locally in this browser, not synced between devices.</p><button className="secondary-button" onClick={()=>{if(confirm('Delete all locally saved Makarh projects and chat?')){localStorage.removeItem('makarh-projects');localStorage.removeItem('makarh-chat');setSaved([]);setMessages([]);onNotice('Local workspace data cleared.')}}}>Clear local workspace data</button></div></section>;
   return <section className="placeholder-page">{toolHeader}<button className="primary-button" onClick={onBack}>Back to overview</button></section>;
 }
-
 export default function App() {
   const [active, setActive] = useState('Overview');
   const [query, setQuery] = useState('');
