@@ -18,7 +18,7 @@ export async function onRequestPost({request,env}){
   const existing=await env.DB.prepare("SELECT username FROM auth_users WHERE username_lower=?").bind(lower).first();
   if(existing)return json({error:"That username is already taken. Choose another."},409);
   const {salt,hash}=await hashPassword(password);
-  const isAdmin=lower==="ssp859326" || lower==="makarhadmin";
+  const isAdmin=false;
   await env.DB.prepare("INSERT INTO auth_users (username,username_lower,password_salt,password_hash,is_admin,created_at,last_login_at) VALUES (?,?,?,?,?,datetime('now'),datetime('now'))").bind(username,lower,salt,hash,isAdmin?1:0).run();
   const token=randomToken(),tokenHash=await digest(token);
   await env.DB.prepare("INSERT INTO auth_sessions (token_hash,user_id,expires_at,created_at) VALUES (?,(SELECT id FROM auth_users WHERE username_lower=?),datetime('now','+7 days'),datetime('now'))").bind(tokenHash,lower).run();
