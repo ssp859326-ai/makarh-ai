@@ -6,19 +6,21 @@ import './styles.css';
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { error: null };
   }
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { error };
   }
-  componentDidCatch(error) {
-    console.error('Makarh AI render error:', error);
+  componentDidCatch(error, info) {
+    console.error('Makarh AI render error:', error, info);
   }
   render() {
-    if (this.state.hasError) {
-      return <main style={{minHeight:'100vh',background:'#0b0b12',color:'#f4f2fb',fontFamily:'system-ui',padding:'32px',boxSizing:'border-box'}}>
-        <h1 style={{color:'#b8a1ff'}}>Makarh AI</h1>
-        <p>The workspace hit a display error. Please refresh once; the issue has been logged for debugging.</p>
+    if (this.state.error) {
+      return <main style={{minHeight:'100vh',background:'#0b0b12',color:'#f4f2fb',fontFamily:'system-ui',padding:'24px',boxSizing:'border-box'}}>
+        <h1 style={{color:'#b8a1ff'}}>Makarh AI — Debug</h1>
+        <p>The dashboard crashed while rendering. Error details:</p>
+        <pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',background:'#171721',padding:'16px',borderRadius:'12px',color:'#ffb4b4'}}>{String(this.state.error?.message || this.state.error)}</pre>
+        <p style={{color:'#b7b4c7'}}>This diagnostic is temporary so we can identify the exact cause.</p>
       </main>;
     }
     return this.props.children;
