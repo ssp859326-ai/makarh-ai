@@ -1,7 +1,7 @@
 const json=(data,status=200)=>Response.json(data,{status,headers:{"Cache-Control":"no-store"}});
 const enc=new TextEncoder();
 async function digest(s){const b=await crypto.subtle.digest("SHA-256",enc.encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
-async function verify(password,saltHex){const salt=Uint8Array.from(saltHex.match(/../g).map(x=>parseInt(x,16)));const key=await crypto.subtle.importKey("raw",enc.encode(password),"PBKDF2",false,["deriveBits"]);const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:210000,hash:"SHA-256"},key,256);return [...new Uint8Array(bits)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+async function verify(password,saltHex){const salt=Uint8Array.from(saltHex.match(/../g).map(x=>parseInt(x,16)));const key=await crypto.subtle.importKey("raw",enc.encode(password),"PBKDF2",false,["deriveBits"]);const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},key,256);return [...new Uint8Array(bits)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 export async function onRequestPost({request,env}){
  try{const b=await request.json(),username=String(b.username||"").trim().toLowerCase(),password=String(b.password||"");if(!username||!password)return json({error:"Enter username and password."},400);
  const u=await env.DB.prepare("SELECT id,username,password_salt,password_hash,is_admin FROM auth_users WHERE username_lower=?").bind(username).first();
