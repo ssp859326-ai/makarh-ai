@@ -1,6 +1,9 @@
+async function currentUser(request,env){const token=(request.headers.get("Cookie")||"").split(";").map(x=>x.trim()).find(x=>x.startsWith("makarh_session="))?.slice(15);if(!token)return null;const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token)),h=[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");return env.DB.prepare("SELECT u.id FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>datetime('now')").bind(h).first()}
 export async function onRequestPost({ request, env }) {
   try {
     if (!env.AI) return Response.json({ error: "AI service is not enabled for this deployment yet." }, { status: 503 });
+    if (!env.DB) return Response.json({ error: "Account database is not configured." }, { status: 503 });
+    if (!await currentUser(request, env)) return Response.json({ error: "Please log in to use Makarh AI chat." }, { status: 401 });
     const body = await request.json();
     const prompt = String(body.prompt || "").trim();
     if (!prompt) return Response.json({ error: "Please enter a question." }, { status: 400 });
