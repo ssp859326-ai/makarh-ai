@@ -15,10 +15,20 @@ export async function onRequestPost({ request, env }) {
     if (!prompt) return Response.json({ error: "Please describe the image you want." }, { status: 400 });
     if (prompt.length > 1800) return Response.json({ error: "Please shorten the image description to 1,800 characters or less." }, { status: 413 });
 
-    // Workers AI image models can return raw image bytes/streams, not always { image: base64 }.
-    const result = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
-      prompt: "Create an image that faithfully follows the user's description. IMPORTANT STYLE RULES: If the user names an anime or manga character, or asks for anime/manga/Japanese animation art, create a polished anime illustration matching the character's recognizable design, hair, outfit, colors, eyes, and signature features. This applies even when the user only types a character name such as Gojo Satoru and does not explicitly say anime. Do not turn anime characters into real people or photorealistic live-action versions unless requested. For other subjects, use the style the user asks for; default to high-quality photorealistic photography only when no illustration or stylized look is implied. Preserve the requested pose, setting, composition, and mood. Avoid unwanted text, watermarks, signatures, borders, and logos unless requested. User description: " + prompt,
-      steps: 4
+    const detailedPrompt = "Create a highly detailed, polished image that faithfully follows the user's description. For real-world people, animals, objects, and scenes, prefer natural photorealism: believable anatomy and proportions, realistic skin/fur/material texture, physically plausible lighting, lifelike eyes, natural colors, detailed environment, and a professional camera photograph aesthetic. Avoid plastic skin, artificial CGI appearance, excessive smoothing, and generic stock-photo composition. If the user names an anime or manga character, or requests anime/cartoon/illustration, respect that style and the recognizable character design; do not convert an explicitly animated character into a real person unless requested. For any other subject, follow the requested style. Preserve the requested pose, setting, composition, and mood. Avoid unwanted text, watermarks, signatures, borders, and logos unless requested. User description: " + prompt;
+
+    // FLUX.2 [dev] supports higher-detail image generation and uses multipart input on Workers AI.
+    const form = new FormData();
+    form.append("prompt", detailedPrompt);
+    form.append("steps", "25");
+    form.append("width", "1024");
+    form.append("height", "1024");
+    const formResponse = new Response(form);
+    const result = await env.AI.run("@cf/black-forest-labs/flux-2-dev", {
+      multipart: {
+        body: formResponse.body,
+        contentType: formResponse.headers.get("content-type")
+      }
     });
 
     let bytes;
