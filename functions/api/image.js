@@ -15,49 +15,20 @@ export async function onRequestPost({ request, env }) {
     if (!prompt) return Response.json({ error: "Please describe the image you want." }, { status: 400 });
     if (prompt.length > 1800) return Response.json({ error: "Please shorten the image description to 1,800 characters or less." }, { status: 413 });
 
-    const detailedPrompt = "Create a highly detailed, polished image that faithfully follows the user's description. For real-world people, animals, objects, and scenes, prefer natural photorealism: believable anatomy and proportions, realistic skin/fur/material texture, physically plausible lighting, lifelike eyes, natural colors, detailed environment, and a professional camera photograph aesthetic. Avoid plastic skin, artificial CGI appearance, excessive smoothing, and generic stock-photo composition. If the user names an anime or manga character, or requests anime/cartoon/illustration, respect that style and the recognizable character design; do not convert an explicitly animated character into a real person unless requested. For any other subject, follow the requested style. Preserve the requested pose, setting, composition, and mood. Avoid unwanted text, watermarks, signatures, borders, and logos unless requested. User description: " + prompt;
-
-    // FLUX.2 [dev] supports higher-detail image generation and uses multipart input on Workers AI.
-    const form = new FormData();
-    form.append("prompt", detailedPrompt);
-    form.append("steps", "25");
-    form.append("width", "1024");
-    form.append("height", "1024");
-    const formResponse = new Response(form);
-    const result = await env.AI.run("@cf/black-forest-labs/flux-2-dev", {
-      multipart: {
-        body: formResponse.body,
-        contentType: formResponse.headers.get("content-type")
-      }
-    });
-
-    let bytes;
-    if (result instanceof Response) {
-      if (!result.ok) throw new Error("Image model returned HTTP " + result.status);
-      bytes = await result.arrayBuffer();
-    } else if (result instanceof ArrayBuffer) {
-      bytes = result;
-    } else if (ArrayBuffer.isView(result)) {
-      bytes = result.buffer.slice(result.byteOffset, result.byteOffset + result.byteLength);
-    } else if (result instanceof ReadableStream) {
-      bytes = await new Response(result).arrayBuffer();
-    } else if (result && typeof result.image === "string") {
-      const encoded = result.image.replace(/^data:image\/[^;]+;base64,/, "");
-      const binary = atob(encoded);
-      const arr = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
-      bytes = arr.buffer;
-    } else if (result && (result.image instanceof ArrayBuffer || ArrayBuffer.isView(result.image))) {
-      const image = result.image;
-      bytes = image instanceof ArrayBuffer ? image : image.buffer.slice(image.byteOffset, image.byteOffset + image.byteLength);
+    // Keep the user's requested visual medium: photorealistic, 2D cartoon, or TV-anime.
+    // FLUX.1 Schnell is the lower-cost option; use its supported short step count.
+    const lowerPrompt = prompt.toLowerCase();
+    const animeStyle = /\\b(anime|manga|goku|dragon ball|gojo|jujutsu kaisen|naruto|one piece|demon slayer)\\b/.test(lowerPrompt);
+    const cartoonStyle = /\\b(cartoon|3d cartoon|pixar style|animated cartoon)\\b/.test(lowerPrompt);
+    const photoStyle = /\\b(realistic|photorealistic|real photo|lifelike|cinematic photo)\\b/.test(lowerPrompt);
+    let styleGuide = "Create a polished image matching the user's description. Preserve the requested subject, pose, composition, setting, lighting, and mood. No unwanted text, watermark, signature, or border.";
+    if (animeStyle) {
+      styleGuide = "Create a high-quality 2D Japanese TV-anime frame, with clean confident line art, expressive anime eyes, cel shading, vivid but balanced colors, detailed anime background, and professional animation-series composition. Keep the character clearly animated; do not make it photorealistic. " + styleGuide;
+    } else if (cartoonStyle) {
+      styleGuide = "Create a high-quality animated cartoon illustration with clear stylized shapes, appealing expressive features, polished shading, and a cohesive cartoon environment. Do not make it photorealistic. " + styleGuide;
+    } else if (photoStyle) {
+      styleGuide = "Create a photorealistic image that looks like a real professional photograph, with believable anatomy, natural skin or fur texture, physically plausible lighting, realistic materials, and a lifelike environment. Avoid illustration, anime, cartoon, and plastic CGI appearance. " + styleGuide;
     } else {
-      throw new Error("Image model returned an unsupported response format.");
+      styleGuide = "Follow the visual medium implied by the user's request. For real-world subjects, prefer natural photorealism; for explicitly animated subjects, preserve their animated style. " + styleGuide;
     }
-
-    if (!bytes || bytes.byteLength < 100) throw new Error("Image model returned empty or incomplete image data.");
-    await env.DB.prepare("INSERT INTO username_image_usage (user_id,prompt_length,created_at) VALUES (?,?,datetime('now'))").bind(user.id,prompt.length).run();
-    return new Response(bytes, {headers: {"Content-Type":"image/png","Cache-Control":"no-store","Content-Disposition":'inline; filename="makarh-ai-image.png"',"X-Content-Type-Options":"nosniff"}});
-  } catch (error) {
-    return Response.json({ error: "Image generation failed. " + String(error?.message || error).slice(0, 180), detail: String(error?.message || error).slice(0, 180) }, { status: 500 });
-  }
-}
+    const detailedPrompt = styleGuide + " User description: " + prompt;}
