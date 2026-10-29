@@ -24,6 +24,13 @@ export async function onRequestPost({ request, env }) {
     if (!text) return Response.json({ error: "The AI model returned an empty response. Please try again." }, { status: 502 });
     return Response.json({ text }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return Response.json({ error: "AI request failed. Please retry shortly.", detail: String(error?.message || error).slice(0, 180) }, { status: 500 });
+    const detail = String(error?.message || error).slice(0, 240);
+    const quota = /4006|daily free allocation|neurons|quota|rate limit/i.test(detail);
+    return Response.json({
+      error: quota
+        ? "Cloudflare AI da free quota khatam ho gaya hai. Quota reset hon te chat dubara chalegi."
+        : "AI request failed. Please retry shortly.",
+      detail
+    }, { status: quota ? 429 : 500 });
   }
 }
